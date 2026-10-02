@@ -143,6 +143,10 @@ fun ReaderWebView(
                 )
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
+                settings.builtInZoomControls = true
+                settings.displayZoomControls = false
+                settings.useWideViewPort = true
+                settings.loadWithOverviewMode = true
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
