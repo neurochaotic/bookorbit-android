@@ -2,6 +2,8 @@ package com.bookorbit.feature.reader
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -33,12 +35,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -97,13 +101,33 @@ fun ReaderScreen(
     ) {
         ReaderWebView(controller = controller, modifier = Modifier.fillMaxSize())
 
-        // Tap zones for paging (paginated mode) + chrome toggle.
+        // Paging taps + chrome toggle (paginated mode), plus pinch-zoom for comics. Both gestures
+        // live on ONE node so the tap overlay no longer swallows the pinch: tap position drives
+        // prev / chrome / next exactly as the old three TapZones did, while a two-finger pinch drives
+        // foliate's own zoom. For reflowable books the zoom command is a no-op (guarded in bridge.js),
+        // so leaving the pinch handler on for every paginated book is harmless.
         if (paginated && !tocVisible && !settingsVisible) {
-            Row(modifier = Modifier.fillMaxSize()) {
-                TapZone(weight = 0.3f, onTap = controller::prev)
-                TapZone(weight = 0.4f, onTap = { chromeVisible = !chromeVisible })
-                TapZone(weight = 0.3f, onTap = controller::next)
-            }
+            val comicZoom = remember { mutableStateOf(1f) }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures { offset ->
+                            when (offset.x / size.width.toFloat()) {
+                                in 0f..0.3f -> controller.prev()
+                                in 0.7f..1f -> controller.next()
+                                else -> chromeVisible = !chromeVisible
+                            }
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            val z = (comicZoom.value * zoom).coerceIn(1f, 4f)
+                            comicZoom.value = z
+                            controller.zoom(String.format(Locale.US, "%.3f", z))
+                        }
+                    },
+            )
         }
 
         if (showChrome) {

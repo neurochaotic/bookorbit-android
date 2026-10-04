@@ -117,19 +117,27 @@ export class FixedLayout extends HTMLElement {
     const blankWidth = left.width ?? right.width ?? 0
     const blankHeight = left.height ?? right.height ?? 0
 
+    // Fit scales are always computed so a numeric zoom can be a multiple of fit-page.
+    const fitWidthScale =
+      (portrait || this.#center
+        ? width / (target.width ?? blankWidth)
+        : width / ((left.width ?? blankWidth) + (right.width ?? blankWidth))) || 1
+    const fitPageScale =
+      (portrait || this.#center
+        ? Math.min(width / (target.width ?? blankWidth), height / (target.height ?? blankHeight))
+        : Math.min(
+            width / ((left.width ?? blankWidth) + (right.width ?? blankWidth)),
+            height / Math.max(left.height ?? blankHeight, right.height ?? blankHeight),
+          )) || 1
+    // A numeric zoom from the host (pinch) is a MULTIPLE OF FIT-PAGE: 1 = whole page, 4 = 4x.
+    // This app's reader is the only caller that ever sets a numeric zoom, so redefining the
+    // numeric case here (was: absolute scale) is safe and gives pinch a natural rest point.
     const scale =
       typeof this.#zoom === 'number' && !isNaN(this.#zoom)
-        ? this.#zoom
-        : (this.#zoom === 'fit-width'
-            ? portrait || this.#center
-              ? width / (target.width ?? blankWidth)
-              : width / ((left.width ?? blankWidth) + (right.width ?? blankWidth))
-            : portrait || this.#center
-              ? Math.min(width / (target.width ?? blankWidth), height / (target.height ?? blankHeight))
-              : Math.min(
-                  width / ((left.width ?? blankWidth) + (right.width ?? blankWidth)),
-                  height / Math.max(left.height ?? blankHeight, right.height ?? blankHeight),
-                )) || 1
+        ? fitPageScale * this.#zoom
+        : this.#zoom === 'fit-width'
+          ? fitWidthScale
+          : fitPageScale
 
     const transform = (frame) => {
       let { element, iframe, width, height, blank, onZoom } = frame
