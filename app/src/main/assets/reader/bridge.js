@@ -283,6 +283,13 @@ window.__readerCommand = (json) => {
     case 'applyStyles':
       applyStyles(cmd.settings);
       break;
+    case 'zoom':
+      // Fixed-layout only (comics / pre-paginated). foliate-fxl observes the `zoom`
+      // attribute: a number, or the strings 'fit-width' / 'fit-page'. Reflowable books
+      // have no such attribute, so this is a harmless no-op there.
+      if (view.renderer?.localName === 'foliate-fxl')
+        view.renderer.setAttribute('zoom', String(cmd.value));
+      break;
     default:
       break;
   }

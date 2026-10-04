@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Base64
+import android.view.ScaleGestureDetector
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebResourceRequest
@@ -17,6 +18,7 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
 import com.bookorbit.core.storage.LocalRef
 import com.bookorbit.core.storage.openInputStream
+import java.util.Locale
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -81,6 +83,11 @@ class ReaderController {
     fun next() = command(buildJsonObject { put("type", "next") }.toString())
     fun prev() = command(buildJsonObject { put("type", "prev") }.toString())
 
+    // Fixed-layout (comic) zoom. `value` is a number formatted with a '.' decimal ("1.500"),
+    // or "fit-width" / "fit-page". The number MUST use Locale.US at the call site — a locale
+    // that emits a decimal comma would make parseFloat() in JS read "1,5" as 1.
+    fun zoom(value: String) = command(buildJsonObject { put("type", "zoom"); put("value", value) }.toString())
+
     fun applyStyles(settings: ReaderSettings) {
         val cmd = buildJsonObject {
             put("type", "applyStyles")
@@ -123,7 +130,7 @@ class ReaderController {
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "ClickableViewAccessibility")
 @Composable
 fun ReaderWebView(
     controller: ReaderController,
@@ -143,13 +150,31 @@ fun ReaderWebView(
                 )
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
-                settings.builtInZoomControls = true
-                settings.displayZoomControls = false
-                settings.useWideViewPort = true
-                settings.loadWithOverviewMode = true
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
                 isVerticalScrollBarEnabled = false
                 isHorizontalScrollBarEnabled = false
+
+                // Pinch-to-zoom for fixed-layout comics. We drive foliate's own zoom (the
+                // foliate-fxl `zoom` attribute) rather than WebView's builtInZoomControls: a comic
+                // page renders inside a sandboxed iframe that foliate sizes by layout, so native
+                // page-zoom never touches it. foliate rescales the iframe and its overflow:auto
+                // host provides panning. The detector feeds off touch events but returns false so
+                // the WebView still gets them for single-finger scrolling and taps.
+                var comicZoom = 1f
+                val scaleDetector = ScaleGestureDetector(
+                    context,
+                    object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                        override fun onScale(detector: ScaleGestureDetector): Boolean {
+                            comicZoom = (comicZoom * detector.scaleFactor).coerceIn(1f, 4f)
+                            controller.zoom(String.format(Locale.US, "%.3f", comicZoom))
+                            return true
+                        }
+                    },
+                )
+                setOnTouchListener { _, event ->
+                    scaleDetector.onTouchEvent(event)
+                    false
+                }
 
                 webViewClient = object : WebViewClientCompat() {
                     override fun shouldInterceptRequest(
