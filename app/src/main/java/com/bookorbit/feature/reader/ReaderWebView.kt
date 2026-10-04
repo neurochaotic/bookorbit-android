@@ -88,6 +88,10 @@ class ReaderController {
     // that emits a decimal comma would make parseFloat() in JS read "1,5" as 1.
     fun zoom(value: String) = command(buildJsonObject { put("type", "zoom"); put("value", value) }.toString())
 
+    // Pan the zoomed-in fixed-layout (comic) by a finger-drag delta in CSS px.
+    fun panBy(dx: Float, dy: Float) =
+        command(buildJsonObject { put("type", "panBy"); put("dx", dx); put("dy", dy) }.toString())
+
     fun applyStyles(settings: ReaderSettings) {
         val cmd = buildJsonObject {
             put("type", "applyStyles")

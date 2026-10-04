@@ -154,7 +154,10 @@ function createView() {
     post({
       type: 'relocate',
       cfi: d.cfi ?? null,
-      fraction: typeof d.fraction === 'number' ? d.fraction : null,
+      // Fixed-layout comics have no section progress, so `fraction` is absent. Fall back to 0 so the
+      // host still persists the position (it only saves when fraction != null); restore uses the cfi,
+      // which already encodes the page index, so page memory works even though the % reads 0.
+      fraction: typeof d.fraction === 'number' ? d.fraction : 0,
       chapterTitle: d.tocItem?.label ?? null,
       location: d.location ?? null,
     });
@@ -289,6 +292,13 @@ window.__readerCommand = (json) => {
       // have no such attribute, so this is a harmless no-op there.
       if (view.renderer?.localName === 'foliate-fxl')
         view.renderer.setAttribute('zoom', String(cmd.value));
+      break;
+    case 'panBy':
+      // Scroll the fixed-layout host while zoomed in. dx/dy are finger-drag deltas (CSS px); the
+      // content should follow the finger, so we scroll the opposite way. foliate-fxl's :host is the
+      // overflow:auto scroll container.
+      if (view.renderer?.localName === 'foliate-fxl')
+        view.renderer.scrollBy(-(cmd.dx ?? 0), -(cmd.dy ?? 0));
       break;
     default:
       break;

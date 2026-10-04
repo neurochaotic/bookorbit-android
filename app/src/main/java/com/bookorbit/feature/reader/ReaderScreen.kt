@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -108,6 +109,7 @@ fun ReaderScreen(
         // so leaving the pinch handler on for every paginated book is harmless.
         if (paginated && !tocVisible && !settingsVisible) {
             val comicZoom = remember { mutableStateOf(1f) }
+            val density = LocalDensity.current.density
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -121,10 +123,16 @@ fun ReaderScreen(
                         }
                     }
                     .pointerInput(Unit) {
-                        detectTransformGestures { _, _, zoom, _ ->
-                            val z = (comicZoom.value * zoom).coerceIn(1f, 4f)
-                            comicZoom.value = z
-                            controller.zoom(String.format(Locale.US, "%.3f", z))
+                        // A two-finger pinch (zoom != 1) drives foliate's zoom; a one-finger drag
+                        // (zoom == 1) pans, but only once zoomed in, so paging taps stay untouched.
+                        detectTransformGestures { _, pan, zoom, _ ->
+                            if (kotlin.math.abs(zoom - 1f) > 0.001f) {
+                                val z = (comicZoom.value * zoom).coerceIn(1f, 4f)
+                                comicZoom.value = z
+                                controller.zoom(String.format(Locale.US, "%.3f", z))
+                            } else if (comicZoom.value > 1f) {
+                                controller.panBy(pan.x / density, pan.y / density)
+                            }
                         }
                     },
             )
