@@ -254,7 +254,12 @@ export class FixedLayout extends HTMLElement {
     return this.book.sections.indexOf(section)
   }
   #reportLocation(reason) {
-    this.dispatchEvent(new CustomEvent('relocate', { detail: { reason, range: null, index: this.index, fraction: 0, size: 1 } }))
+    // Report a real book fraction (page position) so the host can persist and restore the page.
+    // Without it comics report fraction 0, which both breaks the progress bar and (because the host
+    // only saves when fraction != null) stops the page from being remembered.
+    const total = this.#spreads.length
+    const fraction = total > 1 ? this.#index / (total - 1) : 0
+    this.dispatchEvent(new CustomEvent('relocate', { detail: { reason, range: null, index: this.index, fraction, size: 1 } }))
   }
   getSpreadOf(section) {
     const spreads = this.#spreads

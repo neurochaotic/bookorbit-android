@@ -592,6 +592,9 @@ export class View extends HTMLElement {
     const koreaderProgress = getKoreaderProgress(koreaderDocFragmentIndex, range)
     this.lastLocation = {
       ...progress,
+      // Fixed-layout books have no sectionProgress, so `progress` carries no fraction; fall back to
+      // the raw relocate fraction so the host still gets a position to persist.
+      fraction: typeof progress.fraction === 'number' ? progress.fraction : fraction,
       tocItem,
       pageItem,
       cfi,

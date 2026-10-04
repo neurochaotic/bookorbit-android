@@ -210,7 +210,20 @@ async function openBook(meta, parts) {
     });
 
     let navigated = false;
-    if (meta.cfi) {
+    // Fixed-layout comics restore by page index derived from the saved fraction. Their cfi is a
+    // synthetic index-cfi and they have no section progress, so index is the dependable path.
+    if (view.renderer?.localName === 'foliate-fxl' && typeof meta.fraction === 'number') {
+      try {
+        const total = view.book?.sections?.length ?? 0;
+        if (total > 0) {
+          await view.goTo(Math.round(meta.fraction * (total - 1)));
+          navigated = true;
+        }
+      } catch {
+        navigated = false;
+      }
+    }
+    if (!navigated && meta.cfi) {
       try {
         await view.goTo(meta.cfi);
         navigated = true;
